@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>锂离子电池充放电仿真模拟</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #faf5eb;
+            color: #3e3529;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #3e2c1a 0%, #4a3520 50%, #5c4530 100%);
+            color: white;
+            padding: 12px 0;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        header p {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 4px;
+            font-weight: 300;
+        }
+
+        main {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 16px 20px;
+        }
+
+        .simulation-container {
+            background: #fdfaf3;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(60,40,20,0.1);
+            overflow: hidden;
+            border: 1px solid rgba(60,40,20,0.08);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            background: #fdfaf3;
+            border-radius: 0 0 16px 16px;
+        }
+
+    canvas {
+        display: block;
+        margin: 0 auto;
+        max-width: 900px;
+        height: auto;
+        width: 100%;
+    }
+
+        .status-bar {
+            position: absolute;
+            top: 3%;
+            left: 12px;
+            background: rgba(253,250,243,0.95);
+            backdrop-filter: blur(10px);
+            padding: 8px 20px;
+            border-radius: 30px;
+            color: #3e3529;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10;
+            border: 1px solid rgba(60,40,20,0.1);
+            box-shadow: 0 2px 8px rgba(60,40,20,0.08);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+            transition: background 0.3s;
+        }
+
+        .status-dot.charging { background: #4fc3f7; box-shadow: 0 0 8px #4fc3f7; }
+        .status-dot.discharging { background: #ff8a65; box-shadow: 0 0 8px #ff8a65; }
+        .status-dot.idle { background: #66bb6a; box-shadow: 0 0 8px #66bb6a; }
+
+        .soc-display {
+            position: absolute;
+            top: calc(3% + 48px);
+            left: 6%;
+            background: rgba(253,250,243,0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 16px;
+            border-radius: 12px;
+            color: #3e3529;
+            font-size: 13px;
+            z-index: 10;
+            border: 1px solid rgba(60,40,20,0.1);
+            box-shadow: 0 2px 8px rgba(60,40,20,0.08);
+        }
+
+        .soc-display .soc-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #8b6914;
+        }
+
+        .controls {
+            padding: 14px 28px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            border-bottom: 1px solid #e8dcc8;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            border: 2px solid;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+        }
+
+        .btn-charge {
+            border-color: #4fc3f7;
+            color: #0277bd;
+        }
+        .btn-charge:hover { background: #e8f4fd; }
+        .btn-charge.active {
+            background: #0277bd;
+            color: white;
+            box-shadow: 0 4px 15px rgba(2,119,189,0.4);
+        }
+
+        .btn-discharge {
+            border-color: #ff8a65;
+            color: #d84315;
+        }
+        .btn-discharge:hover { background: #fbe8e0; }
+        .btn-discharge.active {
+            background: #d84315;
+            color: white;
+            box-shadow: 0 4px 15px rgba(216,67,21,0.4);
+        }
+
+        .btn-reset {
+            border-color: #a1887f;
+            color: #5d4037;
+        }
+        .btn-reset:hover { background: #efebe9; }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .speed-control label {
+            font-size: 13px;
+            color: #8d6e63;
+            font-weight: 500;
+        }
+
+        .speed-slider {
+            -webkit-appearance: none;
+            width: 120px;
+            height: 6px;
+            border-radius: 3px;
+            background: #d7ccc8;
+            outline: none;
+        }
+
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #795548;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .speed-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4e342e;
+            min-width: 36px;
+        }
+
+        .info-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 18px 28px;
+            border-top: 1px solid #e8dcc8;
+        }
+
+        .legend-card {
+            background: #f8f2e6;
+            border-radius: 12px;
+            padding: 18px 20px;
+        }
+
+        .legend-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4e342e;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .legend-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .icon-li {
+            background: linear-gradient(135deg, #42a5f5, #1e88e5);
+            color: white;
+            box-shadow: 0 2px 8px rgba(30,136,229,0.4);
+        }
+
+        .icon-e {
+            background: linear-gradient(135deg, #ffa726, #fb8c00);
+            color: white;
+            box-shadow: 0 2px 8px rgba(251,140,0,0.4);
+        }
+
+        .icon-cathode {
+            background: linear-gradient(135deg, #ef5350, #c62828);
+            color: white;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+        }
+
+        .icon-anode {
+            background: linear-gradient(135deg, #66bb6a, #2e7d32);
+            color: white;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+        }
+
+        .icon-electrolyte {
+            background: linear-gradient(135deg, #ab47bc, #7b1fa2);
+            color: white;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+        }
+
+        .icon-separator {
+            background: linear-gradient(135deg, #78909c, #455a64);
+            color: white;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+        }
+
+        .explanation-card {
+            background: #f8f2e6;
+            border-radius: 12px;
+            padding: 18px 20px;
+            transition: all 0.3s;
+        }
+
+        .explanation-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4e342e;
+            margin-bottom: 12px;
+        }
+
+        .explanation-card p {
+            font-size: 13px;
+            line-height: 1.8;
+            color: #5d4037;
+        }
+
+        .explanation-card.charge-mode {
+            border-left: 4px solid #0288d1;
+        }
+        .explanation-card.discharge-mode {
+            border-left: 4px solid #e64a19;
+        }
+        .explanation-card.idle-mode {
+            border-left: 4px solid #66bb6a;
+        }
+
+        .direction-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 2px;
+        }
+
+        .direction-right {
+            background: #e1f5fe;
+            color: #0288d1;
+        }
+
+        .direction-left {
+            background: #fbe9e7;
+            color: #e64a19;
+        }
+
+        footer {
+            text-align: center;
+            padding: 12px;
+            color: #a1887f;
+            font-size: 11px;
+        }
+
+        @media (max-width: 768px) {
+            main { padding: 16px 12px; }
+            .controls { padding: 16px; flex-direction: column; align-items: stretch; }
+            .btn-group { justify-content: center; }
+            .speed-control { justify-content: center; margin-left: 0; }
+            .info-panel { grid-template-columns: 1fr; padding: 16px; }
+            header h1 { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>锂离子电池充放电仿真模拟</h1>
+    <p>交互式化学教育工具</p>
+</header>
+
+<main>
+    <div class="simulation-container">
+        <div class="controls">
+            <div class="btn-group">
+                <button class="btn btn-charge" id="btnCharge" onclick="startCharge()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    充电
+                </button>
+                <button class="btn btn-discharge" id="btnDischarge" onclick="startDischarge()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" transform="rotate(180 12 12)"/></svg>
+                    放电
+                </button>
+                <button class="btn btn-reset" onclick="resetSim()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    重置
+                </button>
+            </div>
+            <div class="speed-control">
+                <label>模拟速度</label>
+                <input type="range" class="speed-slider" id="speedSlider" min="0.5" max="3" step="0.5" value="1">
+                <span class="speed-value" id="speedValue">1.0x</span>
+            </div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="batteryCanvas" width="1200" height="600"></canvas>
+            <div class="status-bar">
+                <span class="status-dot idle" id="statusDot"></span>
+                <span id="statusText">待机中 — 请选择充电或放电</span>
+            </div>
+            <div class="soc-display">
+                <div style="margin-bottom:2px">SOC 荷电状态</div>
+                <div class="soc-value" id="socValue">50%</div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="legend-card">
+                <h3>图例说明</h3>
+                <div class="legend-item">
+                    <div class="legend-icon icon-li">Li+</div>
+                    <span>锂离子 (Li+) — 蓝色球体，在电解质中溶剂化迁移</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon icon-e">e-</div>
+                    <span>电子 (e-) — 橙色球体，通过外部电路移动</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon icon-cathode">正</div>
+                    <span>正极 — 钴酸锂 LiCoO2 (层状结构)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon icon-anode">负</div>
+                    <span>负极 — 石墨 C (蜂巢层状结构)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon icon-electrolyte">液</div>
+                    <span>电解质 — 锂盐有机溶液，含溶剂化Li+</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon icon-separator">膜</div>
+                    <span>隔膜 — 聚烯烃微孔膜 (允许Li+通过)</span>
+                </div>
+            </div>
+
+            <div class="explanation-card idle-mode" id="explanationCard">
+                <h3>工作原理说明</h3>
+                <p id="explanationText">
+                    锂离子电池通过锂离子在正负极之间的来回迁移实现充放电。<br><br>
+                    点击<b>「充电」</b>按钮观察锂离子从正极迁移到负极、电子通过外电路从正极流向负极的过程。<br><br>
+                    点击<b>「放电」</b>按钮观察相反的过程：锂离子从负极返回正极，电子通过外电路从负极流向正极为外部设备供电。
+                </p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer>锂离子电池充放电仿真模拟 — 交互式化学教育工具</footer>
+
+<script>
+const canvas = document.getElementById('batteryCanvas');
+const ctx = canvas.getContext('2d');
+
+const W = 1200, H = 600;
+
+let mode = 'idle';
+let speed = 1;
+let soc = 50;
+let particles = [];
+let time = 0;
+let animId = null;
+
+// Layout: Battery centered in the canvas
+// Battery spans from 80 to 780 (width=700), canvas=1200, offset=250 to center
+const OX = 250; // centering offset
+const BATTERY = {
+    y: 85, h: 240,
+    // Left: Anode (Graphite)
+    anode: { x: 80 + OX, w: 200 },
+    // Middle-left: Electrolyte
+    electrolyteL: { x: 280 + OX, w: 130 },
+    // Center: Separator
+    separator: { x: 410 + OX, w: 40 },
+    // Middle-right: Electrolyte
+    electrolyteR: { x: 450 + OX, w: 130 },
+    // Right: Cathode (LiCoO2)
+    cathode: { x: 580 + OX, w: 200 },
+    // External circuit terminals (legacy, not drawn)
+    terminalL: { x: 30 + OX, w: 50 },
+    terminalR: { x: 780 + OX, w: 50 },
+};
+
+class Particle {
+    constructor(type, mode) {
+        this.type = type;
+        this.mode = mode;
+        this.progress = Math.random();
+        this.speed = (0.002 + Math.random() * 0.003);
+        this.lane = Math.floor(Math.random() * 3); // 0-2 for 3 interlayer spaces
+        this.wobble = Math.random() * Math.PI * 2;
+        this.wobbleSpeed = 0.02 + Math.random() * 0.02;
+        this.wobbleAmp = 2; // Reduced wobble
+        this.opacity = 0.7 + Math.random() * 0.3;
+        this.size = type === 'li' ? (7 + Math.random() * 3) : (5 + Math.random() * 3);
+        this.solvated = type === 'li';
+    }
+
+    update() {
+        this.wobble += this.wobbleSpeed * speed;
+        if (this.type === 'li') {
+            // Li+: charge = cathode→anode (right→left), discharge = anode→cathode (left→right)
+            if (this.mode === 'charge') {
+                this.progress += this.speed * speed;
+            } else {
+                this.progress += this.speed * speed;
+            }
+        } else {
+            // e-: charge = cathode→anode (right→left), discharge = anode→cathode (left→right)
+            if (this.mode === 'charge') {
+                this.progress += this.speed * speed;
+            } else {
+                this.progress += this.speed * speed;
+            }
+        }
+        return (this.progress > -0.1 && this.progress < 1.1);
+    }
+
+    getPos() {
+        const B = BATTERY;
+        const p = this.progress;
+        const wobbleY = Math.sin(this.wobble) * this.wobbleAmp;
+
+        if (this.type === 'li') {
+            // Li+ moves through the battery
+            // Charge: cathode(右) → anode(左), progress 0→1, startX=cathode, endX=anode
+            // Discharge: anode(左) → cathode(右), progress 0→1, startX=anode, endX=cathode
+            const isCharge = this.mode === 'charge';
+            const startX = isCharge ? (B.cathode.x + B.cathode.w - 25) : (B.anode.x + 25);
+            const endX = isCharge ? (B.anode.x + 25) : (B.cathode.x + B.cathode.w - 25);
+            let x = startX + p * (endX - startX);
+
+            // Clamp X: never exceed anode left edge or cathode right edge
+            const minX = B.anode.x + 5;
+            const maxX = B.cathode.x + B.cathode.w - 5;
+            x = Math.max(minX, Math.min(maxX, x));
+
+            // Use shared layer constants for consistent interlayer positions
+            const layerIdx = this.lane; // 0, 1, or 2
+            const anodeTargetY = ANODE_LAYERS.getInterlayerY(layerIdx);
+            const cathodeTargetY = CATHODE_LAYERS.getInterlayerY(layerIdx);
+
+            let y;
+            if (x >= B.cathode.x) {
+                // In cathode region - slide in cathode interlayer space
+                y = cathodeTargetY + wobbleY;
+                // Clamp Y within battery bounds
+                y = Math.max(B.y + 10, Math.min(B.y + B.h - 20, y));
+            } else if (x <= B.anode.x + B.anode.w) {
+                // In anode region - slide in anode interlayer space
+                y = anodeTargetY + wobbleY;
+                // Clamp Y within battery bounds
+                y = Math.max(B.y + 10, Math.min(B.y + B.h - 20, y));
+            } else {
+                // In electrolyte/separator region - smoothly interpolate
+                const midY = (anodeTargetY + cathodeTargetY) / 2;
+                if (x >= B.cathode.x - 30) {
+                    // Transition zone near cathode
+                    const t = (x - (B.cathode.x - 30)) / 30;
+                    y = midY + (cathodeTargetY - midY) * t + wobbleY;
+                } else if (x <= B.anode.x + B.anode.w + 30) {
+                    // Transition zone near anode
+                    const t = ((B.anode.x + B.anode.w + 30) - x) / 30;
+                    y = midY + (anodeTargetY - midY) * t + wobbleY;
+                } else {
+                    y = midY + wobbleY;
+                }
+                // Clamp Y within battery bounds
+                y = Math.max(B.y + 10, Math.min(B.y + B.h - 20, y));
+            }
+
+            return { x, y };
+        } else {
+            // e- moves through external circuit along the wire path
+            // Wire path: srcX (electrode top) → vertical up to wireY+30 → horizontal to dstX → vertical down to dstX (electrode top)
+            const wireY = B.y - 55;
+            const isCharge = this.mode === 'charge';
+
+            // Define source and destination
+            const leftX = B.anode.x + B.anode.w / 2;
+            const rightX = B.cathode.x + B.cathode.w / 2;
+            const topWireY = wireY + 30; // Y of the horizontal wire
+
+            let srcX, dstX;
+            if (isCharge) {
+                srcX = rightX;  // cathode
+                dstX = leftX;   // anode
+            } else {
+                srcX = leftX;   // anode
+                dstX = rightX;  // cathode
+            }
+
+            if (p < 0.2) {
+                // Phase 1: vertical from electrode top up to horizontal wire
+                const tp = p / 0.2;
+                return { x: srcX, y: B.y + (topWireY - B.y) * tp };
+            } else if (p < 0.8) {
+                // Phase 2: horizontal along the top wire
+                const tp = (p - 0.2) / 0.6;
+                return { x: srcX + (dstX - srcX) * tp, y: topWireY };
+            } else {
+                // Phase 3: vertical from horizontal wire down to electrode top
+                const tp = (p - 0.8) / 0.2;
+                return { x: dstX, y: topWireY + (B.y - topWireY) * tp };
+            }
+        }
+    }
+}
+
+function spawnParticles() {
+    const maxLI = 15;
+    const maxE = 10;
+    const liCount = particles.filter(p => p.type === 'li').length;
+    const eCount = particles.filter(p => p.type === 'e').length;
+
+    if (mode !== 'idle') {
+        if (liCount < maxLI && Math.random() < 0.06 * speed) {
+            const p = new Particle('li', mode);
+            p.progress = 0;
+            p.lane = Math.floor(Math.random() * 3);
+            particles.push(p);
+        }
+        if (eCount < maxE && Math.random() < 0.05 * speed) {
+            const p = new Particle('e', mode);
+            p.progress = 0;
+            p.lane = Math.floor(Math.random() * 5);
+            particles.push(p);
+        }
+    }
+
+    particles = particles.filter(p => {
+        if (mode === 'idle') {
+            p.progress += p.speed * speed * 0.3;
+            return p.progress < 1.3;
+        }
+        return p.update();
+    });
+}
+
+function drawBackground() {
+    ctx.fillStyle = '#fdfaf3';
+    ctx.fillRect(0, 0, W, H);
+
+    const grad = ctx.createRadialGradient(W/2, H/2, 50, W/2, H/2, 600);
+    grad.addColorStop(0, 'rgba(245,235,215,0.5)');
+    grad.addColorStop(1, 'rgba(253,250,243,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+}
+
+// Shared layer constants for consistent alignment between drawing and particles
+const ANODE_LAYERS = {
+    baseY: BATTERY.y + 35,
+    count: 4,
+    height: (BATTERY.h - 70) / 4,  // each layer occupies this much vertical space
+    thickness: 16,  // visual thickness of the graphite layer line
+    getInterlayerY: function(idx) {
+        // Return the Y center of interlayer space between layer idx and idx+1
+        return this.baseY + this.height * (idx + 0.5);
+    }
+};
+
+const CATHODE_LAYERS = {
+    baseY: BATTERY.y + 30,
+    count: 4,
+    height: (BATTERY.h - 60) / 4,
+    thickness: 16,
+    getInterlayerY: function(idx) {
+        return this.baseY + this.height * (idx + 0.5);
+    }
+};
+
+// Draw hexagonal honeycomb pattern for graphite layers
+function drawHexagon(cx, cy, r, strokeColor, fillColor) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 6;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    if (fillColor) {
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+    }
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+function drawAnodeStructure() {
+    const B = BATTERY;
+    const ax = B.anode.x, aw = B.anode.w;
+    const ay = B.y, ah = B.h;
+    const L = ANODE_LAYERS;
+
+    // Background
+    const anodeGrad = ctx.createLinearGradient(ax, 0, ax + aw, 0);
+    anodeGrad.addColorStop(0, '#4caf50');
+    anodeGrad.addColorStop(0.5, '#66bb6a');
+    anodeGrad.addColorStop(1, '#4caf50');
+    ctx.fillStyle = anodeGrad;
+    roundRect(ax, ay, aw, ah, 8, 0, 0, 8);
+    ctx.fill();
+
+    // Draw graphite layers as horizontal bands
+    const hexR = 16;
+    const hexSpacing = hexR * 1.8;
+
+    for (let layer = 0; layer < L.count; layer++) {
+        const ly = L.baseY + layer * L.height;
+
+        // Draw the graphite layer as a thick semi-transparent band
+        ctx.fillStyle = 'rgba(76,175,80,0.25)';
+        ctx.fillRect(ax + 5, ly - L.thickness/2, aw - 10, L.thickness);
+
+        // Draw hexagonal pattern within the layer band
+        const hexCount = Math.floor((aw - 30) / hexSpacing);
+        for (let i = 0; i < hexCount; i++) {
+            const hx = ax + 20 + i * hexSpacing + (layer % 2) * hexSpacing * 0.5;
+            drawHexagon(hx, ly, hexR, 'rgba(0,100,0,0.2)', 'rgba(76,175,80,0.05)');
+        }
+
+        // Layer boundary line
+        ctx.strokeStyle = 'rgba(0,80,0,0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(ax + 10, ly - L.thickness/2);
+        ctx.lineTo(ax + aw - 10, ly - L.thickness/2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax + 10, ly + L.thickness/2);
+        ctx.lineTo(ax + aw - 10, ly + L.thickness/2);
+        ctx.stroke();
+    }
+
+    // Label - inside the green block, bottom
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = '500 16px "Noto Sans SC"';
+    ctx.textAlign = 'center';
+    ctx.fillText('石墨', ax + aw / 2, ay + BATTERY.h - 6);
+}
+
+function drawCathodeStructure() {
+    const B = BATTERY;
+    const cx = B.cathode.x, cw = B.cathode.w;
+    const cy = B.y, ch = B.h;
+    const L = CATHODE_LAYERS;
+
+    // Background
+    const cathodeGrad = ctx.createLinearGradient(cx, 0, cx + cw, 0);
+    cathodeGrad.addColorStop(0, '#ef5350');
+    cathodeGrad.addColorStop(0.5, '#ef9a9a');
+    cathodeGrad.addColorStop(1, '#ef5350');
+    ctx.fillStyle = cathodeGrad;
+    roundRect(cx, cy, cw, ch, 0, 8, 8, 0);
+    ctx.fill();
+
+    // Draw LiCoO2 layers as horizontal bands
+    for (let layer = 0; layer < L.count; layer++) {
+        const ly = L.baseY + layer * L.height;
+        const layerW = cw - 20;
+
+        // Blue slab (CoO2 layer) as a band
+        ctx.fillStyle = 'rgba(30,136,229,0.6)';
+        ctx.fillRect(cx + 10, ly - L.thickness/2, layerW, L.thickness);
+        ctx.strokeStyle = 'rgba(0,0,100,0.15)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx + 10, ly - L.thickness/2, layerW, L.thickness);
+
+        // Red Li dots on the layer
+        const liCount = 6;
+        for (let i = 0; i < liCount; i++) {
+            const lx = cx + 20 + i * (layerW / (liCount - 1));
+            ctx.beginPath();
+            ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef5350';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(100,0,0,0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Connecting lines between Li dots
+        ctx.strokeStyle = 'rgba(0,80,0,0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < liCount - 1; i++) {
+            const lx1 = cx + 20 + i * (layerW / (liCount - 1));
+            const lx2 = cx + 20 + (i + 1) * (layerW / (liCount - 1));
+            ctx.moveTo(lx1, ly);
+            ctx.lineTo(lx2, ly);
+        }
+        ctx.stroke();
+    }
+
+    // Label - inside the red block, bottom
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = '500 15px "Noto Sans SC"';
+    ctx.textAlign = 'center';
+    ctx.fillText('LiCoO\u2082', cx + cw / 2, cy + BATTERY.h - 6);
+}
+
+function drawElectrolyte() {
+    const B = BATTERY;
+
+    // Left electrolyte
+    const elecGrad = ctx.createLinearGradient(B.electrolyteL.x, 0, B.electrolyteL.x + B.electrolyteL.w, 0);
+    elecGrad.addColorStop(0, 'rgba(123,31,162,0.4)');
+    elecGrad.addColorStop(0.5, 'rgba(156,39,176,0.5)');
+    elecGrad.addColorStop(1, 'rgba(123,31,162,0.4)');
+    ctx.fillStyle = elecGrad;
+    ctx.fillRect(B.electrolyteL.x, B.y, B.electrolyteL.w, B.h);
+
+    // Right electrolyte
+    const elecGrad2 = ctx.createLinearGradient(B.electrolyteR.x, 0, B.electrolyteR.x + B.electrolyteR.w, 0);
+    elecGrad2.addColorStop(0, 'rgba(123,31,162,0.4)');
+    elecGrad2.addColorStop(0.5, 'rgba(156,39,176,0.5)');
+    elecGrad2.addColorStop(1, 'rgba(123,31,162,0.4)');
+    ctx.fillStyle = elecGrad2;
+    ctx.fillRect(B.electrolyteR.x, B.y, B.electrolyteR.w, B.h);
+
+    // Draw solvent molecules (small orange ellipses floating) - clamped within electrolyte bounds
+    const solventCount = 12;
+    ctx.save();
+    // Clip left electrolyte
+    ctx.beginPath();
+    ctx.rect(B.electrolyteL.x, B.y, B.electrolyteL.w, B.h);
+    ctx.clip();
+    for (let i = 0; i < solventCount; i++) {
+        const sx = B.electrolyteL.x + 15 + (i % 4) * 28 + Math.sin(time * 0.015 + i) * 5;
+        const sy = B.y + 30 + Math.floor(i / 4) * 80 + Math.cos(time * 0.012 + i * 2) * 10;
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(Math.sin(time * 0.01 + i) * 0.3);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,167,38,0.5)';
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.restore();
+
+    ctx.save();
+    // Clip right electrolyte
+    ctx.beginPath();
+    ctx.rect(B.electrolyteR.x, B.y, B.electrolyteR.w, B.h);
+    ctx.clip();
+    for (let i = 0; i < solventCount; i++) {
+        const sx = B.electrolyteR.x + 15 + (i % 4) * 28 + Math.cos(time * 0.015 + i) * 5;
+        const sy = B.y + 30 + Math.floor(i / 4) * 80 + Math.sin(time * 0.012 + i * 2) * 10;
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(Math.cos(time * 0.01 + i) * 0.3);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,167,38,0.5)';
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.restore();
+
+    // Label - inside the purple blocks, bottom
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '500 13px "Noto Sans SC"';
+    ctx.textAlign = 'center';
+    ctx.fillText('电解质', B.electrolyteL.x + B.electrolyteL.w / 2, B.y + B.h - 8);
+    ctx.fillText('电解质', B.electrolyteR.x + B.electrolyteR.w / 2, B.y + B.h - 8);
+}
+
+function drawSeparator() {
+    const B = BATTERY;
+    const sx = B.separator.x, sw = B.separator.w;
+
+    const sepGrad = ctx.createLinearGradient(sx, 0, sx + sw, 0);
+    sepGrad.addColorStop(0, 'rgba(120,144,156,0.7)');
+    sepGrad.addColorStop(0.5, 'rgba(120,144,156,0.9)');
+    sepGrad.addColorStop(1, 'rgba(120,144,156,0.7)');
+    ctx.fillStyle = sepGrad;
+    ctx.fillRect(sx, B.y, sw, B.h);
+
+    // Pores - keep within battery bounds
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    const maxPoreY = B.y + B.h - 25; // leave room for label
+    for (let row = 0; row < 25; row++) {
+        for (let col = 0; col < 2; col++) {
+            const px = sx + 8 + col * 18;
+            const py = B.y + 12 + row * 13;
+            if (py > maxPoreY) break; // stop if beyond battery
+            ctx.beginPath();
+            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        const lastPy = B.y + 12 + row * 13;
+        if (lastPy > maxPoreY) break;
+    }
+
+    // Label - inside the gray column, bottom (upright text)
+    ctx.fillStyle = 'rgba(40,40,40,0.8)';
+    ctx.font = '500 13px "Noto Sans SC"';
+    ctx.textAlign = 'center';
+    ctx.fillText('隔膜', sx + sw / 2, B.y + B.h - 10);
+}
+
+function drawExternalCircuit() {
+    const B = BATTERY;
+    const wireY = B.y - 55;
+
+    // Wire path: from anode top -> left terminal -> across top -> right terminal -> cathode top
+    ctx.strokeStyle = '#c49a3c';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+
+    // Left vertical wire (anode top to horizontal wire)
+    ctx.beginPath();
+    ctx.moveTo(B.anode.x + B.anode.w / 2, B.y);
+    ctx.lineTo(B.anode.x + B.anode.w / 2, wireY + 30);
+    ctx.stroke();
+
+    // Top wire
+    ctx.beginPath();
+    ctx.moveTo(B.anode.x + B.anode.w / 2, wireY + 30);
+    ctx.lineTo(B.cathode.x + B.cathode.w / 2, wireY + 30);
+    ctx.stroke();
+
+    // Right vertical wire (cathode top to horizontal wire)
+    ctx.beginPath();
+    ctx.moveTo(B.cathode.x + B.cathode.w / 2, B.y);
+    ctx.lineTo(B.cathode.x + B.cathode.w / 2, wireY + 30);
+    ctx.stroke();
+
+    // Device in the middle of external circuit
+    const midX = (B.terminalL.x + B.terminalL.w + B.terminalR.x) / 2;
+    const deviceY = wireY + 30;
+
+    if (mode === 'charge') {
+        // Charger symbol (battery with plug)
+        ctx.fillStyle = '#4fc3f7';
+        ctx.beginPath();
+        ctx.arc(midX, deviceY, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#0288d1';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Plug icon
+        ctx.fillStyle = '#01579b';
+        ctx.font = '700 13px "Noto Sans SC"';
+        ctx.fillText('充电器', midX, deviceY + 4);
+
+        // Direction arrows
+        drawWireArrow(midX - 60, deviceY, -1, '#4fc3f7');
+        drawWireArrow(midX + 60, deviceY, -1, '#4fc3f7');
+    } else if (mode === 'discharge') {
+        // Light bulb symbol
+        ctx.fillStyle = '#ffeb3b';
+        ctx.beginPath();
+        ctx.arc(midX, deviceY, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#f57f17';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Bulb filament
+        ctx.strokeStyle = '#f57f17';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(midX - 8, deviceY - 5);
+        ctx.lineTo(midX - 4, deviceY + 5);
+        ctx.lineTo(midX, deviceY - 5);
+        ctx.lineTo(midX + 4, deviceY + 5);
+        ctx.lineTo(midX + 8, deviceY - 5);
+        ctx.stroke();
+
+        // Glow effect
+        const glowGrad = ctx.createRadialGradient(midX, deviceY, 0, midX, deviceY, 40);
+        glowGrad.addColorStop(0, 'rgba(255,235,59,0.3)');
+        glowGrad.addColorStop(1, 'rgba(255,235,59,0)');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(midX, deviceY, 40, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Direction arrows
+        drawWireArrow(midX - 60, deviceY, 1, '#ff8a65');
+        drawWireArrow(midX + 60, deviceY, 1, '#ff8a65');
+    } else {
+        // Idle state
+        ctx.strokeStyle = 'rgba(150,150,150,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(midX, deviceY, 22, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(100,100,100,0.6)';
+        ctx.font = '400 12px "Noto Sans SC"';
+        ctx.fillText('外电路', midX, deviceY + 4);
+    }
+}
+
+function drawWireArrow(x, y, dir, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    if (dir > 0) {
+        ctx.moveTo(x - 8, y - 6);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x - 8, y + 6);
+    } else {
+        ctx.moveTo(x + 8, y - 6);
+        ctx.lineTo(x - 6, y);
+        ctx.lineTo(x + 8, y + 6);
+    }
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawParticles() {
+    const B = BATTERY;
+    // Clip all Li+ drawing within battery horizontal bounds (anode left edge to cathode right edge)
+    const liMinX = B.anode.x;
+    const liMaxX = B.cathode.x + B.cathode.w;
+    const liMinY = B.y;
+    const liMaxY = B.y + B.h;
+
+    particles.forEach(p => {
+        const pos = p.getPos();
+        ctx.save();
+
+        if (p.type === 'li') {
+            // Extra safety: clip Li+ (center + glow) within battery bounds
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(liMinX, liMinY, liMaxX - liMinX, liMaxY - liMinY);
+            ctx.clip();
+            // Check if in electrolyte region (show solvation shell)
+            // Li+ is solvated only in electrolyte, not inside electrode layers
+            const B = BATTERY;
+            const inAnode = pos.x >= B.anode.x && pos.x <= B.anode.x + B.anode.w;
+            const inCathode = pos.x >= B.cathode.x && pos.x <= B.cathode.x + B.cathode.w;
+            const inElectrolyte = !inAnode && !inCathode;
+
+            if (inElectrolyte) {
+                // Solvated Li+ : green center + orange petals (solvent shell)
+                // Clip petals within electrolyte bounds
+                const elBounds = [
+                    { x: B.electrolyteL.x, w: B.electrolyteL.w },
+                    { x: B.electrolyteR.x, w: B.electrolyteR.w }
+                ];
+                ctx.save();
+                for (const el of elBounds) {
+                    ctx.beginPath();
+                    ctx.rect(el.x - 2, B.y, el.w + 4, B.h);
+                    ctx.clip();
+                }
+                // Draw 4-6 orange petals around green center
+                const petalCount = 5;
+                const petalDist = p.size * 2.2;
+                for (let i = 0; i < petalCount; i++) {
+                    const angle = (Math.PI * 2 / petalCount) * i + time * 0.02;
+                    const px = pos.x + Math.cos(angle) * petalDist;
+                    const py = pos.y + Math.sin(angle) * petalDist;
+                    ctx.save();
+                    ctx.translate(px, py);
+                    ctx.rotate(angle);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 8, 3, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,167,38,0.6)';
+                    ctx.fill();
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+
+            // Blue Li+ center
+            const glowGrad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, p.size * 2);
+            glowGrad.addColorStop(0, 'rgba(66,165,245,0.5)');
+            glowGrad.addColorStop(1, 'rgba(66,165,245,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#42a5f5';
+            ctx.fill();
+            ctx.strokeStyle = '#1565c0';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${Math.max(7, p.size * 0.9)}px "Noto Sans SC"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Li\u207a', pos.x, pos.y);
+            ctx.restore(); // end battery-bound clip for Li+
+        } else {
+            // e- particle
+            const glowGrad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, p.size * 2.5);
+            glowGrad.addColorStop(0, 'rgba(255,167,38,0.5)');
+            glowGrad.addColorStop(1, 'rgba(255,167,38,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffa726';
+            ctx.fill();
+            ctx.strokeStyle = '#e65100';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${Math.max(6, p.size * 0.85)}px "Noto Sans SC"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('e\u207b', pos.x, pos.y);
+        }
+
+        ctx.restore();
+    });
+}
+
+function drawDirectionArrows() {
+    if (mode === 'idle') return;
+    const B = BATTERY;
+    const arrowColor = mode === 'charge' ? 'rgba(79,195,247,0.6)' : 'rgba(255,138,101,0.6)';
+
+    // e- flow arrow (top, external circuit) - above the device (bulb/charger)
+    const eArrowY = B.y - 50;
+    const eStartX = B.anode.x + B.anode.w / 2;
+    const eEndX = B.cathode.x + B.cathode.w / 2;
+    const eMidX = (eStartX + eEndX) / 2;
+
+    ctx.strokeStyle = arrowColor;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(eStartX, eArrowY);
+    ctx.lineTo(eEndX, eArrowY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (mode === 'charge') {
+        drawWireArrow(eStartX - 5, eArrowY, -1, arrowColor);
+    } else {
+        drawWireArrow(eEndX + 5, eArrowY, 1, arrowColor);
+    }
+
+    ctx.fillStyle = '#ffa726';
+    ctx.font = '600 13px "Noto Sans SC"';
+    ctx.fillText('e\u207b 流动方向', eMidX, eArrowY - 10);
+}
+
+function drawSOCBar() {
+    const barX = BATTERY.cathode.x + BATTERY.cathode.w + 30, barY = BATTERY.y + 15;
+    const barW = 20, barH = BATTERY.h - 40;
+
+    ctx.fillStyle = 'rgba(200,200,200,0.3)';
+    roundRect(barX, barY, barW, barH, 6, 6, 6, 6);
+    ctx.fill();
+
+    const fillH = barH * (soc / 100);
+    const fillColor = soc > 60 ? '#4caf50' : soc > 20 ? '#ff9800' : '#f44336';
+    const grad = ctx.createLinearGradient(barX, barY + barH - fillH, barX, barY + barH);
+    grad.addColorStop(0, fillColor);
+    grad.addColorStop(1, soc > 60 ? '#2e7d32' : soc > 20 ? '#e65100' : '#b71c1c');
+    ctx.fillStyle = grad;
+    roundRect(barX + 2, barY + barH - fillH + 2, barW - 4, fillH - 4, 4, 4, 4, 4);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(100,100,100,0.6)';
+    ctx.font = '500 11px "Noto Sans SC"';
+    ctx.textAlign = 'center';
+    ctx.save();
+    ctx.translate(barX + barW / 2, barY + barH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('SOC', 0, 4);
+    ctx.restore();
+}
+
+function drawChemicalReactions() {
+    if (mode === 'idle') return;
+    const B = BATTERY;
+    const reactionY = B.y + B.h + 75;
+
+    // Draw reaction background panel (larger to fully contain both reaction texts)
+    ctx.fillStyle = 'rgba(245,237,220,0.8)';
+    roundRect(B.anode.x - 80, reactionY - 32, B.cathode.x + B.cathode.w - B.anode.x + 160, 120, 8, 8, 8, 8);
+    ctx.fill();
+
+    // Panel border
+    ctx.strokeStyle = 'rgba(180,160,130,0.5)';
+    ctx.lineWidth = 1.5;
+    roundRect(B.anode.x - 80, reactionY - 32, B.cathode.x + B.cathode.w - B.anode.x + 160, 120, 8, 8, 8, 8);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+
+    if (mode === 'charge') {
+        // Cathode reaction (right side)
+        ctx.fillStyle = 'rgba(239,83,80,0.9)';
+        ctx.font = '500 26px "Noto Sans SC"';
+        ctx.fillText('正极反应', B.cathode.x + B.cathode.w / 2, reactionY + 4);
+        ctx.fillStyle = 'rgba(50,50,50,0.9)';
+        ctx.font = '400 22px "Noto Sans SC"';
+        ctx.fillText('LiCoO\u2082 \u003d Li\u2081\u208b\u2093CoO\u2082 + xLi\u207a + xe\u207b',
+            B.cathode.x + B.cathode.w / 2, reactionY + 42);
+
+        // Anode reaction (left side)
+        ctx.fillStyle = 'rgba(102,187,106,0.9)';
+        ctx.font = '500 26px "Noto Sans SC"';
+        ctx.fillText('负极反应', B.anode.x + B.anode.w / 2, reactionY + 4);
+        ctx.fillStyle = 'rgba(50,50,50,0.9)';
+        ctx.font = '400 22px "Noto Sans SC"';
+        ctx.fillText('6C + xLi\u207a + xe\u207b \u003d Li\u2093C\u2086',
+            B.anode.x + B.anode.w / 2, reactionY + 42);
+    } else if (mode === 'discharge') {
+        // Cathode reaction (right side)
+        ctx.fillStyle = 'rgba(239,83,80,0.9)';
+        ctx.font = '500 26px "Noto Sans SC"';
+        ctx.fillText('正极反应', B.cathode.x + B.cathode.w / 2, reactionY + 4);
+        ctx.fillStyle = 'rgba(50,50,50,0.9)';
+        ctx.font = '400 22px "Noto Sans SC"';
+        ctx.fillText('Li\u2081\u208b\u2093CoO\u2082 + xLi\u207a + xe\u207b \u003d LiCoO\u2082',
+            B.cathode.x + B.cathode.w / 2, reactionY + 42);
+
+        // Anode reaction (left side)
+        ctx.fillStyle = 'rgba(102,187,106,0.9)';
+        ctx.font = '500 26px "Noto Sans SC"';
+        ctx.fillText('负极反应', B.anode.x + B.anode.w / 2, reactionY + 4);
+        ctx.fillStyle = 'rgba(50,50,50,0.9)';
+        ctx.font = '400 22px "Noto Sans SC"';
+        ctx.fillText('Li\u2093C\u2086 \u2212 xe\u207b \u003d 6C + xLi\u207a',
+            B.anode.x + B.anode.w / 2, reactionY + 42);
+    }
+}
+
+function roundRect(x, y, w, h, tlr, trr, brr, blr) {
+    ctx.beginPath();
+    ctx.moveTo(x + tlr, y);
+    ctx.lineTo(x + w - trr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + trr);
+    ctx.lineTo(x + w, y + h - brr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - brr, y + h);
+    ctx.lineTo(x + blr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - blr);
+    ctx.lineTo(x, y + tlr);
+    ctx.quadraticCurveTo(x, y, x + tlr, y);
+    ctx.closePath();
+}
+
+function updateSOC() {
+    if (mode === 'charge') {
+        soc = Math.min(100, soc + 0.03 * speed);
+    } else if (mode === 'discharge') {
+        soc = Math.max(0, soc - 0.03 * speed);
+    }
+    document.getElementById('socValue').textContent = Math.round(soc) + '%';
+
+    if (soc >= 100 && mode === 'charge') {
+        setMode('idle');
+        document.getElementById('statusText').textContent = '充电完成！电池已充满';
+    }
+    if (soc <= 0 && mode === 'discharge') {
+        setMode('idle');
+        document.getElementById('statusText').textContent = '放电完成！电池已耗尽';
+    }
+}
+
+function draw() {
+    time++;
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+    drawAnodeStructure();
+    drawCathodeStructure();
+    drawElectrolyte();
+    drawSeparator();
+    drawExternalCircuit();
+    drawChemicalReactions();
+    drawSOCBar();
+    drawDirectionArrows();
+    spawnParticles();
+    drawParticles();
+    updateSOC();
+    animId = requestAnimationFrame(draw);
+}
+
+function setMode(newMode) {
+    mode = newMode;
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const card = document.getElementById('explanationCard');
+    const expText = document.getElementById('explanationText');
+
+    dot.className = 'status-dot ' + (newMode === 'charge' ? 'charging' : newMode === 'discharge' ? 'discharging' : 'idle');
+
+    document.getElementById('btnCharge').classList.toggle('active', newMode === 'charge');
+    document.getElementById('btnDischarge').classList.toggle('active', newMode === 'discharge');
+
+    if (newMode === 'charge') {
+        text.textContent = '充电中 — Li+ 从正极迁向负极';
+        card.className = 'explanation-card charge-mode';
+        expText.innerHTML = '<b>充电过程：</b>外部电源（充电器）施加电压，锂离子从正极（LiCoO\u2082）中脱出，<span class="direction-tag direction-left">经电解质通过隔膜向左迁向负极</span>。同时，电子<span class="direction-tag direction-left">通过外部电路从正极（右）流向负极（左）</span>。锂离子和电子在负极石墨层间复合，嵌入石墨形成 Li\u2093C。';
+    } else if (newMode === 'discharge') {
+        text.textContent = '放电中 — Li+ 从负极迁向正极';
+        card.className = 'explanation-card discharge-mode';
+        expText.innerHTML = '<b>放电过程：</b>锂离子从负极（石墨）层间脱出，<span class="direction-tag direction-right">经电解质通过隔膜向右迁向正极</span>。同时，电子<span class="direction-tag direction-right">通过外部电路从负极（左）流向正极（右）</span>，为灯泡等外部设备供电。锂离子和电子在正极与钴酸锂重新结合。';
+    } else {
+        text.textContent = '待机中 — 请选择充电或放电';
+        card.className = 'explanation-card idle-mode';
+        expText.innerHTML = '锂离子电池通过锂离子在正负极之间的来回迁移实现充放电。<br><br>点击<b>「充电」</b>按钮观察锂离子从正极迁移到负极、电子通过外电路从正极流向负极的过程。<br><br>点击<b>「放电」</b>按钮观察相反的过程：锂离子从负极返回正极，电子通过外电路从负极流向正极为外部设备（灯泡）供电。';
+    }
+}
+
+function startCharge() {
+    if (soc >= 100) {
+        document.getElementById('statusText').textContent = '电池已充满，请先放电或重置';
+        return;
+    }
+    particles = [];
+    setMode('charge');
+}
+
+function startDischarge() {
+    if (soc <= 0) {
+        document.getElementById('statusText').textContent = '电池已耗尽，请先充电或重置';
+        return;
+    }
+    particles = [];
+    setMode('discharge');
+}
+
+function resetSim() {
+    soc = 50;
+    particles = [];
+    setMode('idle');
+    document.getElementById('socValue').textContent = '50%';
+}
+
+document.getElementById('speedSlider').addEventListener('input', function() {
+    speed = parseFloat(this.value);
+    document.getElementById('speedValue').textContent = speed.toFixed(1) + 'x';
+});
+
+draw();
+</script>
+</body>
+</html>
